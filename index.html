@@ -3,12 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bingo - Mi Cartón</title>
+    <title>Bingo Digital</title>
     <style>
-        :root { --primary: #2c3e50; --accent: #e74c3c; --success: #27ae60; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a2e; color: white; margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
-        h1 { margin: 20px 0; color: #f1c40f; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+        :root { --bg: #1a1a2e; --card: #ecf0f1; --mark: #e74c3c; }
+        body { font-family: sans-serif; background: var(--bg); color: white; display: flex; flex-direction: column; align-items: center; padding: 10px; margin: 0; }
         
+        /* Contenedor individual para cada cartón */
+        .carton-wrapper { 
+            margin-bottom: 30px; 
+            width: 100%; 
+            max-width: 500px; 
+            border: 2px solid #f1c40f; 
+            padding: 10px; 
+            border-radius: 12px;
+            background: rgba(255,255,255,0.05);
+        }
+
+        h2 { color: #f1c40f; text-align: center; font-size: 1.2rem; margin: 5px 0 10px 0; text-transform: uppercase; }
+
         .grid { 
             display: grid; 
             grid-template-columns: repeat(9, 1fr); 
@@ -16,14 +28,11 @@
             background: #34495e; 
             padding: 8px; 
             border-radius: 8px; 
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-            width: 95vw;
-            max-width: 700px;
         }
 
         .cell { 
             aspect-ratio: 1/1; 
-            background: #ecf0f1; 
+            background: var(--card); 
             color: #2c3e50; 
             display: flex; 
             align-items: center; 
@@ -31,79 +40,65 @@
             font-weight: bold; 
             font-size: 1.2rem; 
             border-radius: 4px; 
-            cursor: pointer; 
-            transition: all 0.2s;
-            user-select: none;
+            cursor: pointer;
+            position: relative;
             -webkit-tap-highlight-color: transparent;
         }
 
-        .empty { background: #95a5a6; opacity: 0.3; cursor: default; }
+        .empty { background: #95a5a6; opacity: 0.15; cursor: default; }
 
-        .marked { 
-            background: var(--accent) !important; 
-            color: white !important; 
-            transform: scale(0.9);
-            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
-        }
+        .marked { background: var(--mark) !important; color: white !important; }
+        .marked::after { content: "X"; position: absolute; font-size: 1.8rem; opacity: 0.4; }
 
-        .marked::after { content: "✖"; position: absolute; font-size: 1.5rem; opacity: 0.7; }
-
-        .controls { margin-top: 30px; width: 100%; display: flex; justify-content: center; }
-        .btn-bingo { 
-            padding: 15px 40px; 
-            font-size: 1.5rem; 
-            font-weight: bold;
-            background: var(--success); 
-            color: white; 
-            border: none; 
-            border-radius: 50px; 
-            box-shadow: 0 5px 15px rgba(39, 174, 96, 0.4);
-            cursor: pointer;
-        }
-        .btn-bingo:active { transform: translateY(3px); box-shadow: none; }
+        .btn-bingo { margin: 20px; padding: 15px 45px; background: #27ae60; color: white; border: none; border-radius: 50px; font-weight: bold; font-size: 1.4rem; cursor: pointer; }
     </style>
 </head>
 <body>
-    <h1>MI CARTÓN</h1>
-    <div id="board" class="grid"></div>
-    <div class="controls">
-        <button class="btn-bingo" onclick="cantarBingo()">¡BINGO!</button>
-    </div>
+    <div id="main-container" style="width: 100%; display: flex; flex-direction: column; align-items: center;"></div>
+    <button class="btn-bingo" onclick="confirm('¿Cantar BINGO?') && alert('¡Suerte!')">¡BINGO!</button>
 
     <script>
-        // Leemos los datos de la URL (ej: ?data=0-5-0-32-45-0-67-78-0,...)
         const params = new URLSearchParams(window.location.search);
-        const data = params.get('data');
+        const allData = params.get('data');
 
-        if (data) {
-            const board = document.getElementById('board');
-            const rows = data.split(',');
+        if (allData) {
+            const main = document.getElementById('main-container');
+            // Separamos la cadena por el símbolo '|' que pusimos en C#
+            const cartones = allData.split('|');
 
-            rows.forEach(rowStr => {
-                const nums = rowStr.split('-');
-                nums.forEach(n => {
-                    const div = document.createElement('div');
-                    const val = parseInt(n);
-                    
-                    if (val === 0) {
-                        div.className = 'cell empty';
-                    } else {
-                        div.className = 'cell';
-                        div.innerText = val;
-                        div.onclick = () => div.classList.toggle('marked');
-                    }
-                    board.appendChild(div);
+            cartones.forEach((cartonData, index) => {
+                // Creamos un envoltorio para el cartón
+                const wrapper = document.createElement('div');
+                wrapper.className = 'carton-wrapper';
+                wrapper.innerHTML = `<h2>CARTÓN #${index + 1}</h2>`;
+
+                const grid = document.createElement('div');
+                grid.className = 'grid';
+
+                // Separamos las 3 filas del cartón
+                const rows = cartonData.split(',');
+                rows.forEach(rowStr => {
+                    // Separamos los 9 números de la fila
+                    rowStr.split('-').forEach(n => {
+                        const val = parseInt(n);
+                        const div = document.createElement('div');
+                        
+                        if (val === 0 || isNaN(val)) {
+                            div.className = 'cell empty';
+                        } else {
+                            div.className = 'cell';
+                            div.innerText = val;
+                            div.onclick = () => div.classList.toggle('marked');
+                        }
+                        grid.appendChild(div);
+                    });
                 });
+
+                wrapper.appendChild(grid);
+                main.appendChild(wrapper);
             });
         } else {
-            document.body.innerHTML = "<h1>Error: No hay datos del cartón</h1><p>Escanea el QR desde la App de Bingo.</p>";
-        }
-
-        function cantarBingo() {
-            // Un pequeño efecto de vibración y alerta
-            if(confirm("¿Estás seguro de que tienes BINGO?")) {
-                alert("¡Felicidades! ¡Avisa al cantante!");
-            }
+            document.body.innerHTML = "<h1>Error</h1><p>No se recibieron datos de los cartones.</p>";
         }
     </script>
 </body>
