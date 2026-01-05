@@ -6,29 +6,29 @@
     <title>Bingo Digital</title>
     <style>
         :root { --bg: #1a1a2e; --card: #ecf0f1; --mark: #e74c3c; }
-        * { box-sizing: border-box; } /* Esto evita que los bordes ensanchen el div */
+        * { box-sizing: border-box; }
         
-        body { font-family: sans-serif; background: var(--bg); color: white; display: flex; flex-direction: column; align-items: center; padding: 5px; margin: 0; overflow-x: hidden; }
+        body { font-family: sans-serif; background: var(--bg); color: white; display: flex; flex-direction: column; align-items: center; padding: 10px; margin: 0; overflow-x: hidden; }
         
         .carton-wrapper { 
-            margin-bottom: 20px; 
+            margin-bottom: 25px; 
             width: 100%; 
-            max-width: 450px; 
+            max-width: 480px; 
             border: 2px solid #f1c40f; 
-            padding: 5px; 
-            border-radius: 10px;
-            background: rgba(255,255,255,0.03);
+            padding: 8px; 
+            border-radius: 12px;
+            background: rgba(255,255,255,0.05);
         }
 
-        h2 { color: #f1c40f; text-align: center; font-size: 1rem; margin: 5px 0; text-transform: uppercase; }
+        h2 { color: #f1c40f; text-align: center; font-size: 1.1rem; margin: 5px 0 10px 0; text-transform: uppercase; }
 
         .grid { 
             display: grid; 
             grid-template-columns: repeat(9, 1fr); 
-            gap: 2px; 
+            gap: 3px; 
             background: #34495e; 
-            padding: 4px; 
-            border-radius: 6px; 
+            padding: 6px; 
+            border-radius: 8px; 
         }
 
         .cell { 
@@ -39,18 +39,18 @@
             align-items: center; 
             justify-content: center; 
             font-weight: bold; 
-            font-size: 1.1rem; 
-            border-radius: 3px; 
+            font-size: 1.2rem; 
+            border-radius: 4px; 
             cursor: pointer;
             position: relative;
             -webkit-tap-highlight-color: transparent;
         }
 
-        .empty { background: #95a5a6; opacity: 0.1; cursor: default; }
+        .empty { background: #95a5a6; opacity: 0.12; cursor: default; }
         .marked { background: var(--mark) !important; color: white !important; }
-        .marked::after { content: "X"; position: absolute; font-size: 1.5rem; opacity: 0.3; }
+        .marked::after { content: "X"; position: absolute; font-size: 1.8rem; opacity: 0.4; }
 
-        .btn-bingo { margin: 15px; padding: 12px 40px; background: #27ae60; color: white; border: none; border-radius: 50px; font-weight: bold; font-size: 1.2rem; box-shadow: 0 4px 10px rgba(0,0,0,0.4); }
+        .btn-bingo { margin: 20px; padding: 15px 45px; background: #27ae60; color: white; border: none; border-radius: 50px; font-weight: bold; font-size: 1.4rem; box-shadow: 0 5px 15px rgba(0,0,0,0.4); }
     </style>
 </head>
 <body>
