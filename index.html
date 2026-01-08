@@ -3,135 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Bingo Digital V3 - Tiempo Real</title>
+    <title>Bingo Digital V3</title>
     <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-database-compat.js"></script>
-    
     <style>
         :root { --bg: #1a1a2e; --card: #ecf0f1; --mark: #e74c3c; --gold: #f1c40f; }
-        * { box-sizing: border-box; }
         body { font-family: sans-serif; background: var(--bg); color: white; display: flex; flex-direction: column; align-items: center; padding: 10px; margin: 0; }
-        
-        .header-info { text-align: center; margin-bottom: 15px; }
-        .sala-badge { background: var(--gold); color: #000; padding: 5px 15px; border-radius: 20px; font-weight: bold; }
-        .last-ball { font-size: 2.5rem; color: var(--gold); font-weight: bold; margin: 10px 0; display: block; }
-
-        .carton-wrapper { margin-bottom: 25px; width: 100%; max-width: 480px; border: 2px solid var(--gold); padding: 8px; border-radius: 12px; background: rgba(255,255,255,0.05); }
-        h2 { color: var(--gold); text-align: center; font-size: 1.1rem; margin: 5px 0 10px 0; text-transform: uppercase; }
-        
+        .sala-badge { background: var(--gold); color: #000; padding: 5px 15px; border-radius: 20px; font-weight: bold; margin-top: 10px; }
+        .carton-wrapper { width: 100%; max-width: 480px; border: 2px solid var(--gold); padding: 8px; border-radius: 12px; background: rgba(255,255,255,0.05); margin-top: 20px; }
         .grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 3px; background: #34495e; padding: 6px; border-radius: 8px; }
-        .cell { aspect-ratio: 1/1; background: var(--card); color: #2c3e50; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; border-radius: 4px; position: relative; transition: 0.3s; }
+        .cell { aspect-ratio: 1/1; background: var(--card); color: #2c3e50; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.1rem; border-radius: 4px; transition: 0.2s; cursor: pointer; }
         .empty { background: #95a5a6; opacity: 0.12; cursor: default; }
-        
-        /* Marcado automático cuando sale la bola */
-        .marked { background: var(--mark) !important; color: white !important; transform: scale(1.05); box-shadow: 0 0 15px var(--mark); }
-        
-        .btn-bingo { margin: 20px; padding: 15px 45px; background: #27ae60; color: white; border: none; border-radius: 50px; font-weight: bold; font-size: 1.4rem; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
-        .btn-bingo:active { transform: scale(0.95); }
+        .marked { background: var(--mark) !important; color: white !important; transform: scale(0.92); }
+        .btn-bingo { margin: 25px; padding: 15px 45px; background: #27ae60; color: white; border: none; border-radius: 50px; font-weight: bold; font-size: 1.4rem; cursor: pointer; }
     </style>
 </head>
 <body>
-
-    <div class="header-info">
-        <p>SALA: <span id="sala-id" class="sala-badge">---</span></p>
-        <span class="last-ball" id="bola-actual">--</span>
-        <p>ÚLTIMA BOLA CANTADA</p>
-    </div>
-
-    <div id="main-container" style="width: 100%; display: flex; flex-direction: column; align-items: center;">
-        </div>
-
-    <button class="btn-bingo" onclick="cantarBingo()">¡BINGO!</button>
+    <div class="sala-badge">SALA: <span id="sala-id">---</span></div>
+    
+    <div id="main-container" style="width: 100%; display: flex; flex-direction: column; align-items: center;"></div>
+    
+    <button class="btn-bingo" onclick="confirm('¿Cantar BINGO?') && alert('¡Bingo reclamado!')">¡BINGO!</button>
 
     <script>
-        // --- CONFIGURACIÓN DE FIREBASE (COPIA DE TU CONSOLA) ---
-        const firebaseConfig = {
-            databaseURL: "https://tu-proyecto-default-rtdb.firebaseio.com/" 
-        };
+        const firebaseConfig = { databaseURL: "https://bingov3-1ec3a-default-rtdb.europe-west1.firebasedatabase.app/" };
         firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
 
-        // --- LÓGICA DE SALA ---
         const params = new URLSearchParams(window.location.search);
         const idSala = params.get('sala');
-        document.getElementById('sala-id').innerText = idSala || "SIN SALA";
+        document.getElementById('sala-id').innerText = idSala || "ERR";
 
-        // --- REGLA: 15 NÚMEROS, 5 POR FILA ---
-        function generarCartonDigital() {
+        function generarCartonSinRepetidos() {
             let carton = Array.from({length: 3}, () => Array(9).fill(0));
+            let numerosUsados = new Set();
+
             for(let r=0; r<3; r++) {
-                let columnasUsadas = [];
-                while(columnasUsadas.length < 5) {
-                    let col = Math.floor(Math.random() * 9);
-                    if(!columnasUsadas.includes(col)) {
-                        let min = col === 0 ? 1 : col * 10;
-                        let max = col === 8 ? 91 : (col + 1) * 10;
-                        carton[r][col] = Math.floor(Math.random() * (max - min)) + min;
-                        columnasUsadas.push(col);
-                    }
+                let cols = [];
+                while(cols.length < 5) {
+                    let c = Math.floor(Math.random() * 9);
+                    if(!cols.includes(c)) cols.push(c);
                 }
+                cols.forEach(c => {
+                    let min = c === 0 ? 1 : c * 10;
+                    let max = c === 8 ? 91 : (c + 1) * 10;
+                    let num;
+                    do {
+                        num = Math.floor(Math.random() * (max - min)) + min;
+                    } while (numerosUsados.has(num)); // Evita repetidos en todo el cartón
+                    
+                    carton[r][c] = num;
+                    numerosUsados.add(num);
+                });
             }
             return carton;
         }
 
-        // Crear Cartón en el HTML
         if (idSala) {
+            const miCarton = generarCartonSinRepetidos();
             const main = document.getElementById('main-container');
-            const miCarton = generarCartonDigital();
-            
             const wrapper = document.createElement('div');
             wrapper.className = 'carton-wrapper';
-            wrapper.innerHTML = `<h2>TU CARTÓN</h2>`;
-            
+            wrapper.innerHTML = `<h2>MI CARTÓN</h2>`;
             const grid = document.createElement('div');
             grid.className = 'grid';
 
             miCarton.forEach(fila => {
                 fila.forEach(num => {
                     const div = document.createElement('div');
-                    if (num === 0) {
-                        div.className = 'cell empty';
-                    } else {
-                        div.className = 'cell';
-                        div.innerText = num;
-                        div.id = `cell-${num}`; // ID para marcarlo automáticamente
-                        // Permitir marcado manual también por si acaso
+                    if (num === 0) div.className = 'cell empty';
+                    else {
+                        div.className = 'cell'; 
+                        div.innerText = num; 
                         div.onclick = () => div.classList.toggle('marked');
                     }
                     grid.appendChild(div);
                 });
             });
-
             wrapper.appendChild(grid);
             main.appendChild(wrapper);
-
-            // --- ESCUCHAR FIREBASE EN TIEMPO REAL ---
-            db.ref(`Salas/${idSala}/UltimaBola`).on('value', (snapshot) => {
-                const bola = snapshot.val();
-                if (bola) {
-                    document.getElementById('bola-actual').innerText = bola;
-                    // Marcar automáticamente si el número está en mi cartón
-                    const celda = document.getElementById(`cell-${bola}`);
-                    if (celda) {
-                        celda.classList.add('marked');
-                    }
-                }
-            });
-        } else {
-            alert("Por favor, escanea un código QR válido para entrar en una sala.");
-        }
-
-        function cantarBingo() {
-            if(confirm('¿Has completado el cartón?')) {
-                // Opcional: Enviar aviso de Bingo a la App del Administrador
-                if(idSala) {
-                    db.ref(`Salas/${idSala}/Avisos`).push({
-                        tipo: "BINGO",
-                        timestamp: Date.now()
-                    });
-                }
-                alert('¡BINGO RECLAMADO! Espera la comprobación.');
-            }
         }
     </script>
 </body>
