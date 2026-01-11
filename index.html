@@ -9,19 +9,17 @@
     <style>
         :root { --bg: #1a1a2e; --card: #ecf0f1; --mark: #e74c3c; --gold: #f1c40f; }
         body { font-family: sans-serif; background: var(--bg); color: white; display: flex; flex-direction: column; align-items: center; padding: 10px; margin: 0; }
-        .sala-badge { background: var(--gold); color: #000; padding: 5px 15px; border-radius: 20px; font-weight: bold; margin-top: 10px; }
-        .info-bola { margin: 15px; font-size: 1.2rem; color: var(--gold); }
+        .sala-badge { background: var(--gold); color: #000; padding: 5px 15px; border-radius: 20px; font-weight: bold; margin: 20px 0; }
         .carton-wrapper { width: 100%; max-width: 480px; border: 2px solid var(--gold); padding: 8px; border-radius: 12px; background: rgba(255,255,255,0.05); }
         .grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 3px; background: #34495e; padding: 6px; border-radius: 8px; }
         .cell { aspect-ratio: 1/1; background: var(--card); color: #2c3e50; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.1rem; border-radius: 4px; cursor: pointer; transition: 0.2s; }
         .empty { background: #95a5a6; opacity: 0.12; cursor: default; }
         .marked { background: var(--mark) !important; color: white !important; transform: scale(0.92); }
-        .btn-bingo { margin: 25px; padding: 15px 45px; background: #27ae60; color: white; border: none; border-radius: 50px; font-weight: bold; font-size: 1.4rem; cursor: pointer; }
+        .btn-bingo { margin: 30px; padding: 15px 45px; background: #27ae60; color: white; border: none; border-radius: 50px; font-weight: bold; font-size: 1.4rem; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
     </style>
 </head>
 <body>
     <div class="sala-badge">SALA: <span id="sala-id">---</span></div>
-    
     
     <div id="main-container" style="width: 100%; display: flex; flex-direction: column; align-items: center;"></div>
     
@@ -30,61 +28,64 @@
     <script>
         const firebaseConfig = { databaseURL: "https://bingov3-1ec3a-default-rtdb.europe-west1.firebasedatabase.app/" };
         firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
 
         const params = new URLSearchParams(window.location.search);
         const idSala = params.get('sala');
         document.getElementById('sala-id').innerText = idSala || "ERR";
 
-        function generarCartonBingo() {
+        function generarNuevoCarton() {
             let carton = Array.from({length: 3}, () => Array(9).fill(0));
             let numerosUsados = new Set();
             
-            // 1. Decidir qué columnas tendrán números en cada fila (5 por fila)
+            // 1. Decidir 5 posiciones por fila
             for (let r = 0; r < 3; r++) {
                 let cols = [];
                 while (cols.length < 5) {
                     let c = Math.floor(Math.random() * 9);
                     if (!cols.includes(c)) cols.push(c);
                 }
-                cols.forEach(c => carton[r][c] = -1); // Marca temporal de "aquí va un número"
+                cols.forEach(c => carton[r][c] = -1);
             }
 
-            // 2. Llenar las columnas y ORDENAR de menor a mayor verticalmente
+            // 2. Llenar y ordenar verticalmente
             for (let c = 0; c < 9; c++) {
-                let celdasAFiltrar = [];
+                let filasConNumero = [];
                 for (let r = 0; r < 3; r++) {
-                    if (carton[r][c] === -1) celdasAFiltrar.push(r);
+                    if (carton[r][c] === -1) filasConNumero.push(r);
                 }
 
-                if (celdasAFiltrar.length > 0) {
+                if (filasConNumero.length > 0) {
                     let min = c === 0 ? 1 : c * 10;
-                    let max = c === 8 ? 90 : (c * 10) + 9; // Límites correctos por columna
-                    if (c === 8) max = 90; 
+                    let max = (c * 10) + 9;
+                    if (c === 8) max = 90;
 
-                    let numsColumna = [];
-                    while (numsColumna.length < celdasAFiltrar.length) {
+                    let numsCol = [];
+                    while (numsCol.length < filasConNumero.length) {
                         let n = Math.floor(Math.random() * (max - min + 1)) + min;
                         if (!numerosUsados.has(n)) {
-                            numsColumna.push(n);
+                            numsCol.push(n);
                             numerosUsados.add(n);
                         }
                     }
-                    
-                    // Ordenar los números de la columna de menor a mayor
-                    numsColumna.sort((a, b) => a - b);
-                    
-                    // Asignar los números ordenados a las filas marcadas
-                    celdasAFiltrar.forEach((filaIndex, i) => {
-                        carton[filaIndex][c] = numsColumna[i];
-                    });
+                    numsCol.sort((a, b) => a - b);
+                    filasConNumero.forEach((f, i) => carton[f][c] = numsCol[i]);
                 }
             }
             return carton;
         }
 
+        function obtenerCarton(sala) {
+            const key = `bingo_carton_${sala}`;
+            const guardado = localStorage.getItem(key);
+            if (guardado) return JSON.parse(guardado);
+
+            const nuevo = generarNuevoCarton();
+            localStorage.setItem(key, JSON.stringify(nuevo));
+            return nuevo;
+        }
+
         if (idSala) {
-            const miCarton = generarCartonBingo();
+            const miCarton = obtenerCarton(idSala);
             const main = document.getElementById('main-container');
             const wrapper = document.createElement('div');
             wrapper.className = 'carton-wrapper';
@@ -107,11 +108,6 @@
             });
             wrapper.appendChild(grid);
             main.appendChild(wrapper);
-
-            db.ref(`Salas/${idSala}/UltimaBola`).on('value', (s) => {
-                const b = s.val();
-                if (b > 0) document.getElementById('bola-actual').innerText = b;
-            });
         }
     </script>
 </body>
