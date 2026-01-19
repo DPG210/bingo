@@ -9,105 +9,105 @@
     <style>
         :root { --bg: #1a1a2e; --card: #ecf0f1; --mark: #e74c3c; --gold: #f1c40f; }
         body { font-family: sans-serif; background: var(--bg); color: white; display: flex; flex-direction: column; align-items: center; padding: 10px; margin: 0; }
-        .sala-badge { background: var(--gold); color: #000; padding: 5px 15px; border-radius: 20px; font-weight: bold; margin: 20px 0; }
+        
+        /* Estilo para el Registro de Nick */
+        #nick-screen { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+        input { padding: 15px; border-radius: 10px; border: 2px solid var(--gold); background: #16213e; color: white; width: 100%; max-width: 300px; font-size: 1.2rem; margin-bottom: 20px; text-align: center; }
+
+        .sala-badge { background: var(--gold); color: #000; padding: 5px 15px; border-radius: 20px; font-weight: bold; margin: 10px 0; }
         .carton-wrapper { width: 100%; max-width: 480px; border: 2px solid var(--gold); padding: 8px; border-radius: 12px; background: rgba(255,255,255,0.05); }
         .grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 3px; background: #34495e; padding: 6px; border-radius: 8px; }
-        .cell { aspect-ratio: 1/1; background: var(--card); color: #2c3e50; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.1rem; border-radius: 4px; cursor: pointer; transition: 0.2s; }
-        .empty { background: #95a5a6; opacity: 0.12; cursor: default; }
+        .cell { aspect-ratio: 1/1; background: var(--card); color: #2c3e50; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.1rem; border-radius: 4px; }
         .marked { background: var(--mark) !important; color: white !important; transform: scale(0.92); }
-        .btn-bingo { margin: 30px; padding: 15px 45px; background: #27ae60; color: white; border: none; border-radius: 50px; font-weight: bold; font-size: 1.4rem; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        
+        .actions { display: flex; gap: 10px; margin-top: 20px; width: 100%; max-width: 480px; }
+        .btn { flex: 1; padding: 15px; border: none; border-radius: 10px; font-weight: bold; color: white; cursor: pointer; }
+        .btn-linea { background: #2980b9; }
+        .btn-bingo { background: #27ae60; }
     </style>
 </head>
 <body>
+    <div id="nick-screen">
+        <h2 style="color: var(--gold)">BINGO V3</h2>
+        <input type="text" id="nick-input" placeholder="Escribe tu nombre..." maxlength="12">
+        <button class="btn btn-bingo" style="max-width: 300px" onclick="setNick()">ENTRAR A JUGAR</button>
+    </div>
+
     <div class="sala-badge">SALA: <span id="sala-id">---</span></div>
+    <div id="main-container"></div>
     
-    <div id="main-container" style="width: 100%; display: flex; flex-direction: column; align-items: center;"></div>
-    
-    <button class="btn-bingo" onclick="confirm('¿Cantar BINGO?') && alert('¡Bingo reclamado!')">¡BINGO!</button>
+    <div class="actions">
+        <button class="btn btn-linea" onclick="notificar('LÍNEA')">¡LÍNEA!</button>
+        <button class="btn btn-bingo" onclick="notificar('BINGO')">¡BINGO!</button>
+    </div>
 
     <script>
         const firebaseConfig = { databaseURL: "https://bingov3-1ec3a-default-rtdb.europe-west1.firebasedatabase.app/" };
         firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
 
-        const params = new URLSearchParams(window.location.search);
-        const idSala = params.get('sala');
+        let nick = "";
+        const idSala = new URLSearchParams(window.location.search).get('sala');
         document.getElementById('sala-id').innerText = idSala || "ERR";
 
-        function generarNuevoCarton() {
-            let carton = Array.from({length: 3}, () => Array(9).fill(0));
-            let numerosUsados = new Set();
-            
-            // 1. Decidir 5 posiciones por fila
-            for (let r = 0; r < 3; r++) {
-                let cols = [];
-                while (cols.length < 5) {
-                    let c = Math.floor(Math.random() * 9);
-                    if (!cols.includes(c)) cols.push(c);
-                }
-                cols.forEach(c => carton[r][c] = -1);
+        function setNick() {
+            const val = document.getElementById('nick-input').value.trim();
+            if(val) {
+                nick = val;
+                document.getElementById('nick-screen').style.display = 'none';
+                initCarton();
             }
-
-            // 2. Llenar y ordenar verticalmente
-            for (let c = 0; c < 9; c++) {
-                let filasConNumero = [];
-                for (let r = 0; r < 3; r++) {
-                    if (carton[r][c] === -1) filasConNumero.push(r);
-                }
-
-                if (filasConNumero.length > 0) {
-                    let min = c === 0 ? 1 : c * 10;
-                    let max = (c * 10) + 9;
-                    if (c === 8) max = 90;
-
-                    let numsCol = [];
-                    while (numsCol.length < filasConNumero.length) {
-                        let n = Math.floor(Math.random() * (max - min + 1)) + min;
-                        if (!numerosUsados.has(n)) {
-                            numsCol.push(n);
-                            numerosUsados.add(n);
-                        }
-                    }
-                    numsCol.sort((a, b) => a - b);
-                    filasConNumero.forEach((f, i) => carton[f][c] = numsCol[i]);
-                }
-            }
-            return carton;
         }
 
-        function obtenerCarton(sala) {
-            const key = `bingo_carton_${sala}`;
-            const guardado = localStorage.getItem(key);
-            if (guardado) return JSON.parse(guardado);
-
-            const nuevo = generarNuevoCarton();
-            localStorage.setItem(key, JSON.stringify(nuevo));
-            return nuevo;
+        function notificar(tipo) {
+            if(confirm(`¿Confirmas cantar ${tipo}?`)) {
+                // Escribimos la notificación en Firebase
+                db.ref(`Salas/${idSala}/Notificaciones`).set({
+                    msg: `¡${nick} ha cantado ${tipo}!`,
+                    t: Date.now()
+                });
+            }
         }
 
-        if (idSala) {
-            const miCarton = obtenerCarton(idSala);
-            const main = document.getElementById('main-container');
-            const wrapper = document.createElement('div');
-            wrapper.className = 'carton-wrapper';
-            wrapper.innerHTML = `<h2>MI CARTÓN</h2>`;
+        function initCarton() {
+            const key = `carton_${idSala}`;
+            let carton = localStorage.getItem(key) ? JSON.parse(localStorage.getItem(key)) : generarCarton();
+            localStorage.setItem(key, JSON.stringify(carton));
+            render(carton);
+        }
+
+        function generarCarton() {
+            let c = Array.from({length: 3}, () => Array(9).fill(0));
+            let u = new Set();
+            for(let r=0; r<3; r++) {
+                let p = [];
+                while(p.length < 5) { let x = Math.floor(Math.random()*9); if(!p.includes(x)) p.push(x); }
+                p.forEach(x => {
+                    let min = x*10||1, max = (x*10)+9; if(x==8) max=90;
+                    let n; do { n = Math.floor(Math.random()*(max-min+1))+min; } while(u.has(n));
+                    c[r][x] = n; u.add(n);
+                });
+            }
+            // Orden vertical
+            for(let x=0; x<9; x++) {
+                let col = []; for(let r=0; r<3; r++) if(c[r][x]>0) col.push({r, v: c[r][x]});
+                col.sort((a,b)=>a.v-b.v).forEach((o, i) => c[col[i].r][x] = o.v);
+            }
+            return c;
+        }
+
+        function render(carton) {
+            const container = document.getElementById('main-container');
             const grid = document.createElement('div');
             grid.className = 'grid';
-
-            miCarton.forEach(fila => {
-                fila.forEach(num => {
-                    const div = document.createElement('div');
-                    if (num === 0) {
-                        div.className = 'cell empty';
-                    } else {
-                        div.className = 'cell'; 
-                        div.innerText = num; 
-                        div.onclick = () => div.classList.toggle('marked');
-                    }
-                    grid.appendChild(div);
-                });
-            });
-            wrapper.appendChild(grid);
-            main.appendChild(wrapper);
+            carton.forEach(f => f.forEach(n => {
+                const d = document.createElement('div');
+                d.className = n > 0 ? 'cell' : 'cell empty';
+                d.innerText = n > 0 ? n : '';
+                if(n > 0) d.onclick = () => d.classList.toggle('marked');
+                grid.appendChild(d);
+            }));
+            container.appendChild(grid);
         }
     </script>
 </body>
