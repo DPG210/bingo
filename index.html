@@ -1,44 +1,34 @@
 <!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Bingo Digital V3</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bingo Jugador</title>
     <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-database-compat.js"></script>
     <style>
-        :root { --bg: #1a1a2e; --card: #ecf0f1; --mark: #e74c3c; --gold: #f1c40f; }
-        body { font-family: sans-serif; background: var(--bg); color: white; display: flex; flex-direction: column; align-items: center; padding: 10px; margin: 0; }
-        
-        /* Estilo para el Registro de Nick */
-        #nick-screen { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
-        input { padding: 15px; border-radius: 10px; border: 2px solid var(--gold); background: #16213e; color: white; width: 100%; max-width: 300px; font-size: 1.2rem; margin-bottom: 20px; text-align: center; }
-
-        .sala-badge { background: var(--gold); color: #000; padding: 5px 15px; border-radius: 20px; font-weight: bold; margin: 10px 0; }
-        .carton-wrapper { width: 100%; max-width: 480px; border: 2px solid var(--gold); padding: 8px; border-radius: 12px; background: rgba(255,255,255,0.05); }
-        .grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 3px; background: #34495e; padding: 6px; border-radius: 8px; }
-        .cell { aspect-ratio: 1/1; background: var(--card); color: #2c3e50; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.1rem; border-radius: 4px; }
-        .marked { background: var(--mark) !important; color: white !important; transform: scale(0.92); }
-        
-        .actions { display: flex; gap: 10px; margin-top: 20px; width: 100%; max-width: 480px; }
-        .btn { flex: 1; padding: 15px; border: none; border-radius: 10px; font-weight: bold; color: white; cursor: pointer; }
-        .btn-linea { background: #2980b9; }
-        .btn-bingo { background: #27ae60; }
+        body { font-family: sans-serif; background: #1a1a2e; color: white; text-align: center; }
+        #nick-screen { position: fixed; inset: 0; background: #1a1a2e; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
+        input { padding: 15px; border-radius: 10px; margin-bottom: 20px; width: 80%; max-width: 300px; }
+        .carton { display: grid; grid-template-columns: repeat(9, 1fr); gap: 5px; max-width: 500px; margin: auto; }
+        .cell { background: #ecf0f1; color: #2c3e50; aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; font-weight: bold; border-radius: 5px; }
+        .marked { background: #e74c3c !important; color: white !important; }
+        .btn { padding: 15px 25px; border: none; border-radius: 25px; color: white; font-weight: bold; margin: 10px; cursor: pointer; }
     </style>
 </head>
 <body>
     <div id="nick-screen">
-        <h2 style="color: var(--gold)">BINGO V3</h2>
-        <input type="text" id="nick-input" placeholder="Escribe tu nombre..." maxlength="12">
-        <button class="btn btn-bingo" style="max-width: 300px" onclick="setNick()">ENTRAR A JUGAR</button>
+        <h2>Introduce tu Nick</h2>
+        <input type="text" id="nick-input" placeholder="Tu nombre...">
+        <button class="btn" style="background: #27ae60" onclick="entrar()">ENTRAR</button>
     </div>
 
-    <div class="sala-badge">SALA: <span id="sala-id">---</span></div>
-    <div id="main-container"></div>
-    
-    <div class="actions">
-        <button class="btn btn-linea" onclick="notificar('LÍNEA')">¡LÍNEA!</button>
-        <button class="btn btn-bingo" onclick="notificar('BINGO')">¡BINGO!</button>
+    <h1>SALA: <span id="sala-id">---</span></h1>
+    <div id="carton-container" class="carton"></div>
+
+    <div style="margin-top: 20px;">
+        <button class="btn" style="background: #2980b9" onclick="notificar('LÍNEA')">¡LÍNEA!</button>
+        <button class="btn" style="background: #27ae60" onclick="notificar('BINGO')">¡BINGO!</button>
     </div>
 
     <script>
@@ -48,20 +38,19 @@
 
         let nick = "";
         const idSala = new URLSearchParams(window.location.search).get('sala');
-        document.getElementById('sala-id').innerText = idSala || "ERR";
+        document.getElementById('sala-id').innerText = idSala;
 
-        function setNick() {
-            const val = document.getElementById('nick-input').value.trim();
-            if(val) {
-                nick = val;
+        function entrar() {
+            nick = document.getElementById('nick-input').value.trim();
+            if(nick) {
                 document.getElementById('nick-screen').style.display = 'none';
-                initCarton();
+                generarCarton();
             }
         }
 
         function notificar(tipo) {
-            if(confirm(`¿Confirmas cantar ${tipo}?`)) {
-                // Escribimos la notificación en Firebase
+            if(confirm(`¿Cantar ${tipo}?`)) {
+                // Envía el Nick y el tipo de premio a Firebase
                 db.ref(`Salas/${idSala}/Notificaciones`).set({
                     msg: `¡${nick} ha cantado ${tipo}!`,
                     t: Date.now()
@@ -69,45 +58,9 @@
             }
         }
 
-        function initCarton() {
-            const key = `carton_${idSala}`;
-            let carton = localStorage.getItem(key) ? JSON.parse(localStorage.getItem(key)) : generarCarton();
-            localStorage.setItem(key, JSON.stringify(carton));
-            render(carton);
-        }
-
         function generarCarton() {
-            let c = Array.from({length: 3}, () => Array(9).fill(0));
-            let u = new Set();
-            for(let r=0; r<3; r++) {
-                let p = [];
-                while(p.length < 5) { let x = Math.floor(Math.random()*9); if(!p.includes(x)) p.push(x); }
-                p.forEach(x => {
-                    let min = x*10||1, max = (x*10)+9; if(x==8) max=90;
-                    let n; do { n = Math.floor(Math.random()*(max-min+1))+min; } while(u.has(n));
-                    c[r][x] = n; u.add(n);
-                });
-            }
-            // Orden vertical
-            for(let x=0; x<9; x++) {
-                let col = []; for(let r=0; r<3; r++) if(c[r][x]>0) col.push({r, v: c[r][x]});
-                col.sort((a,b)=>a.v-b.v).forEach((o, i) => c[col[i].r][x] = o.v);
-            }
-            return c;
-        }
-
-        function render(carton) {
-            const container = document.getElementById('main-container');
-            const grid = document.createElement('div');
-            grid.className = 'grid';
-            carton.forEach(f => f.forEach(n => {
-                const d = document.createElement('div');
-                d.className = n > 0 ? 'cell' : 'cell empty';
-                d.innerText = n > 0 ? n : '';
-                if(n > 0) d.onclick = () => d.classList.toggle('marked');
-                grid.appendChild(d);
-            }));
-            container.appendChild(grid);
+            // ... Aquí usa tu lógica de generación de 15 números y 5 por fila
+            // Al crear los divs de las celdas, añade: div.onclick = () => div.classList.toggle('marked');
         }
     </script>
 </body>
