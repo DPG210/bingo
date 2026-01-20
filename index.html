@@ -1,53 +1,185 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-    <title>Bingo Player</title>
+    <meta charset="UTF-8">
+    <title>Mi Cartón de Bingo</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
     <style>
-        body { background: #0F1123; color: white; font-family: sans-serif; text-align: center; }
-        .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; padding: 20px; max-width: 400px; margin: auto; }
-        .cell { background: #252A4E; padding: 20px; border-radius: 10px; font-weight: bold; font-size: 1.2rem; cursor: pointer; border: 2px solid transparent; }
-        .marked { background: #FFD700; color: #0F1123; border-color: white; }
-        .last-num { font-size: 3rem; color: #FFD700; margin-top: 20px; }
+        :root {
+            --paper-color: #fdfaf0;
+            --border-color: #d4a373;
+            --ink-color: #1a1a1a;
+            --stamp-color: rgba(196, 30, 58, 0.7);
+        }
+
+        body { 
+            background: #2c3e50; 
+            color: #333; 
+            font-family: 'Courier New', Courier, monospace; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .header {
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            margin-bottom: 10px;
+        }
+
+        /* Contenedor del cartón */
+        .ticket {
+            background-color: var(--paper-color);
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 0 50px rgba(0,0,0,0.05);
+            border: 2px solid var(--border-color);
+            position: relative;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        /* Líneas punteadas clásicas */
+        .ticket::before {
+            content: "BINGO TRADICIONAL";
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #c41e3a;
+            color: white;
+            padding: 2px 15px;
+            font-size: 0.8rem;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+
+        .grid { 
+            display: grid; 
+            grid-template-columns: repeat(9, 1fr); /* 9 columnas estándar de bingo */
+            gap: 5px;
+            background: rgba(0,0,0,0.1);
+            padding: 5px;
+            border: 1px solid #ccc;
+        }
+
+        .cell { 
+            background: white; 
+            aspect-ratio: 1; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            font-weight: bold; 
+            font-size: 1.4rem; 
+            cursor: pointer; 
+            position: relative;
+            border: 1px solid #eee;
+            color: var(--ink-color);
+        }
+
+        /* Celda vacía grisácea como los cartones reales */
+        .empty {
+            background: #e0e0e0;
+            cursor: default;
+        }
+
+        /* Efecto de tachado realista */
+        .marked::after {
+            content: "X";
+            position: absolute;
+            color: var(--stamp-color);
+            font-size: 2.5rem;
+            font-family: 'Brush Script MT', cursive;
+            transform: rotate(-10deg);
+            pointer-events: none;
+        }
+
+        .last-num-panel {
+            background: #1a1d3d;
+            color: #ffd700;
+            padding: 10px 30px;
+            border-radius: 50px;
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 25px;
+            border: 3px solid #ffd700;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
+        }
+
+        .sala-tag {
+            color: #bdc3c7;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
     </style>
 </head>
 <body>
-    <h1>SALA: <span id="sala-id">---</span></h1>
-    <div class="last-num" id="last-ball">--</div>
-    <div class="grid" id="carton"></div>
+    <div class="sala-tag">SALA: <span id="sala-id">---</span></div>
+    <div class="last-num-panel" id="last-ball">--</div>
+    
+    <div class="ticket">
+        <div class="grid" id="carton"></div>
+    </div>
 
     <script>
-        // 1. Configuración Firebase (Usa la misma que en MAUI)
+        // CONFIGURACIÓN FIREBASE
         const firebaseConfig = { databaseURL: "https://bingov3-1ec3a-default-rtdb.europe-west1.firebasedatabase.app/" };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // 2. Obtener sala de la URL (?sala=1234)
         const urlParams = new URLSearchParams(window.location.search);
-        const sala = urlParams.get('sala');
+        const sala = urlParams.get('sala') || "TEST";
         document.getElementById('sala-id').innerText = sala;
 
-        // 3. Generar cartón de 15 números (5 por fila)
+        // GENERACIÓN DE CARTÓN REALISTA (15 números en 3 filas)
         const cartonDiv = document.getElementById('carton');
-        let numeros = [];
-        while(numeros.length < 15) {
-            let n = Math.floor(Math.random() * 90) + 1;
-            if(!numeros.includes(n)) numeros.push(n);
+        
+        // Creamos una matriz de 3 filas x 9 columnas (formato oficial)
+        let matrix = Array(3).fill().map(() => Array(9).fill(null));
+        let totalNumeros = 0;
+
+        // Lógica para colocar 5 números por fila aleatoriamente
+        for(let f=0; f<3; f++) {
+            let posiciones = [];
+            while(posiciones.length < 5) {
+                let p = Math.floor(Math.random() * 9);
+                if(!posiciones.includes(p)) posiciones.push(p);
+            }
+            posiciones.forEach(p => {
+                // Generar número según la columna (0-9, 10-19, etc.)
+                let min = p * 10 + 1;
+                let max = (p + 1) * 10;
+                let num = Math.floor(Math.random() * (max - min + 1)) + min;
+                matrix[f][p] = num;
+            });
         }
-        numeros.sort((a,b) => a-b).forEach(n => {
-            const div = document.createElement('div');
-            div.className = 'cell';
-            div.innerText = n;
-            div.onclick = () => div.classList.toggle('marked');
-            cartonDiv.appendChild(div);
+
+        // Dibujar el cartón
+        matrix.forEach(fila => {
+            fila.forEach(num => {
+                const div = document.createElement('div');
+                if(num === null) {
+                    div.className = 'cell empty';
+                } else {
+                    div.className = 'cell';
+                    div.innerText = num;
+                    div.onclick = () => div.classList.toggle('marked');
+                }
+                cartonDiv.appendChild(div);
+            });
         });
 
-        // 4. Escuchar el número que saca el Admin
+        // Escuchar Firebase
         db.ref(`Salas/${sala}/Ultima`).on('value', (snapshot) => {
             const val = snapshot.val();
-            if(val) document.getElementById('last-ball').innerText = val;
+            if(val) {
+                document.getElementById('last-ball').innerText = val;
+                if (navigator.vibrate) navigator.vibrate(200);
+            }
         });
     </script>
 </body>
