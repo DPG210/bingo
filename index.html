@@ -7,20 +7,25 @@
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
     <style>
-        :root { --paper: #ffffff; --dark: #1a1a2e; --accent: #e94560; --win: #27ae60; }
+        :root { --dark: #1a1a2e; --accent: #e94560; --win: #27ae60; }
         body { background: var(--dark); color: white; font-family: sans-serif; text-align: center; margin: 0; padding: 15px; }
         
-        .setup-section { margin-bottom: 20px; background: #16213e; padding: 15px; border-radius: 10px; }
-        input { padding: 10px; border-radius: 5px; border: none; width: 80%; max-width: 300px; margin-bottom: 10px; font-size: 1rem; }
+        /* Pantalla de Entrada */
+        #login-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh; }
+        .login-box { background: #16213e; padding: 30px; border-radius: 15px; box-shadow: 0 10px 20px rgba(0,0,0,0.5); width: 80%; max-width: 350px; }
         
-        .action-buttons { display: flex; gap: 10px; max-width: 500px; margin: 0 auto 20px auto; }
-        .btn { border: none; padding: 15px; border-radius: 10px; color: white; font-weight: bold; flex: 1; cursor: pointer; font-size: 1.1rem; }
+        /* Juego (oculto al inicio) */
+        #game-screen { display: none; }
+
+        input { padding: 15px; border-radius: 8px; border: none; width: 90%; margin-bottom: 20px; font-size: 1.1rem; text-align: center; }
+        .btn { border: none; padding: 15px; border-radius: 10px; color: white; font-weight: bold; cursor: pointer; font-size: 1.1rem; width: 100%; }
+        .btn-entry { background: var(--accent); }
+        .action-buttons { display: flex; gap: 10px; margin-bottom: 15px; }
         .btn-linea { background: var(--win); }
         .btn-bingo { background: var(--accent); }
 
-        .last-num-container { background: white; color: var(--dark); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; font-weight: bold; margin: 10px auto; border: 4px solid var(--accent); }
-        
-        .ticket { background: var(--paper); padding: 10px; border-radius: 8px; max-width: 600px; margin: auto; border: 3px solid #2c3e50; }
+        .last-num-ball { background: white; color: var(--dark); width: 70px; height: 70px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: bold; margin: 10px auto; border: 4px solid var(--accent); }
+        .ticket { background: white; padding: 10px; border-radius: 8px; max-width: 600px; margin: auto; border: 3px solid #2c3e50; }
         .grid { display: grid; grid-template-columns: repeat(9, 1fr); background: #2c3e50; gap: 2px; }
         .cell { background: white; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.2rem; cursor: pointer; color: #333; position: relative; }
         .empty { background: #f0f0f0; }
@@ -29,44 +34,57 @@
 </head>
 <body>
 
-    <div class="setup-section">
-        <input type="text" id="nick-name" placeholder="Escribe tu Nick aquí...">
+    <div id="login-screen">
+        <div class="login-box">
+            <h2 style="color: var(--accent)">BINGO ONLINE</h2>
+            <p>Introduce tu nombre para entrar en la sala <b id="sala-name-display"></b></p>
+            <input type="text" id="nick-input" placeholder="Tu Apodo">
+            <button class="btn btn-entry" onclick="entrarAlJuego()">JUGAR</button>
+        </div>
+    </div>
+
+    <div id="game-screen">
         <div class="action-buttons">
             <button class="btn btn-linea" onclick="cantar('LÍNEA')">¡LÍNEA!</button>
             <button class="btn btn-bingo" onclick="cantar('BINGO')">¡BINGO!</button>
         </div>
+        <div class="last-num-ball" id="last-ball">--</div>
+        <div class="ticket"><div class="grid" id="carton"></div></div>
+        <p id="player-welcome" style="margin-top: 15px; color: #888;"></p>
     </div>
-
-    <div class="last-num-container" id="last-ball">--</div>
-    
-    <div class="ticket">
-        <div class="grid" id="carton"></div>
-    </div>
-
-    <p style="color: #888; font-size: 0.8rem; margin-top: 15px;">SALA: <span id="sala-id">...</span></p>
 
     <script>
         const firebaseConfig = { databaseURL: "https://bingov3-1ec3a-default-rtdb.europe-west1.firebasedatabase.app/" };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
-
         const sala = new URLSearchParams(window.location.search).get('sala') || "TEST";
-        document.getElementById('sala-id').innerText = sala;
+        document.getElementById('sala-name-display').innerText = sala;
 
-        // --- PERSISTENCIA Y GENERACIÓN ---
-        const storageKey = `bingo_carton_${sala}`;
-        let miCarton = JSON.parse(localStorage.getItem(storageKey)) || generarEstructura();
+        let miNick = "";
+        const storageKey = `bingo_data_${sala}`;
+
+        function entrarAlJuego() {
+            miNick = document.getElementById('nick-input').value.trim();
+            if(miNick.length < 2) return alert("Escribe un nick válido");
+            
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('game-screen').style.display = 'block';
+            document.getElementById('player-welcome').innerText = "Jugando como: " + miNick;
+            
+            inicializarCarton();
+        }
+
+        function inicializarCarton() {
+            let saved = JSON.parse(localStorage.getItem(storageKey));
+            let matrix = saved || generarEstructura();
+            render(matrix);
+        }
 
         function generarEstructura() {
             const matrix = Array(3).fill().map(() => Array(9).fill(null));
             const cols = Array(9).fill().map((_, i) => {
-                let min = i * 10 + (i === 0 ? 1 : 0);
-                let max = i === 8 ? 90 : i * 10 + 9;
-                let nums = [];
-                while(nums.length < 3) {
-                    let n = Math.floor(Math.random() * (max - min + 1)) + min;
-                    if(!nums.includes(n)) nums.push(n);
-                }
+                let min = i * 10 + (i === 0 ? 1 : 0), max = i === 8 ? 90 : i * 10 + 9;
+                let nums = []; while(nums.length < 3) { let n = Math.floor(Math.random() * (max - min + 1)) + min; if(!nums.includes(n)) nums.push(n); }
                 return nums.sort((a,b) => a-b);
             });
             for(let f=0; f<3; f++) {
@@ -80,32 +98,28 @@
             return matrix;
         }
 
-        function toggle(f, c) {
-            if(miCarton[f][c]) {
-                miCarton[f][c].marcado = !miCarton[f][c].marcado;
-                localStorage.setItem(storageKey, JSON.stringify(miCarton));
-                render();
-            }
-        }
-
-        function render() {
+        function render(matrix) {
             const container = document.getElementById('carton');
             container.innerHTML = '';
-            miCarton.forEach((fila, f) => fila.forEach((celda, c) => {
+            matrix.forEach((fila, f) => fila.forEach((celda, c) => {
                 const div = document.createElement('div');
                 div.className = celda ? `cell ${celda.marcado ? 'marked' : ''}` : 'cell empty';
-                if(celda) { div.innerText = celda.valor; div.onclick = () => toggle(f,c); }
+                if(celda) { 
+                    div.innerText = celda.valor; 
+                    div.onclick = () => {
+                        celda.marcado = !celda.marcado;
+                        localStorage.setItem(storageKey, JSON.stringify(matrix));
+                        render(matrix);
+                    };
+                }
                 container.appendChild(div);
             }));
         }
 
         function cantar(tipo) {
-            const nick = document.getElementById('nick-name').value;
-            if(!nick) return alert("Ponte un nick primero");
-            db.ref(`Salas/${sala}/Aviso`).set({ jugador: nick, tipo: tipo, t: Date.now() });
+            db.ref(`Salas/${sala}/Aviso`).set({ jugador: miNick, tipo: tipo, t: Date.now() });
         }
 
-        render();
         db.ref(`Salas/${sala}/Ultima`).on('value', snap => {
             if(snap.val()) document.getElementById('last-ball').innerText = snap.val();
         });
