@@ -2,41 +2,48 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Bingo Player - dpg210</title>
+    <title>Bingo Player</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
     <style>
-        :root { --dark: #1a1a2e; --accent: #e94560; --win: #27ae60; --paper: #ffffff; }
-        body { background: var(--dark); color: white; font-family: sans-serif; text-align: center; margin: 0; padding: 15px; }
-        #login-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh; }
-        .login-box { background: #16213e; padding: 30px; border-radius: 15px; width: 85%; max-width: 350px; }
+        :root { --dark: #1a1a2e; --accent: #e94560; --win: #27ae60; }
+        body { background: var(--dark); color: white; font-family: 'Segoe UI', sans-serif; text-align: center; margin: 0; padding: 10px; }
+        #login-screen { display: flex; align-items: center; justify-content: center; height: 90vh; }
+        .login-box { background: #16213e; padding: 30px; border-radius: 20px; width: 85%; max-width: 350px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         #game-screen { display: none; }
-        input { padding: 15px; border-radius: 8px; border: none; width: 90%; margin-bottom: 20px; font-size: 1.1rem; text-align: center; }
-        .btn { border: none; padding: 15px; border-radius: 10px; color: white; font-weight: bold; cursor: pointer; width: 100%; transition: 0.2s; }
+        input { padding: 15px; border-radius: 10px; border: none; width: 90%; margin-bottom: 20px; font-size: 1.1rem; text-align: center; background: #0f3460; color: white; }
+        .btn { border: none; padding: 15px; border-radius: 12px; color: white; font-weight: bold; cursor: pointer; width: 100%; font-size: 1rem; }
         .btn-linea { background: var(--win); margin-bottom: 10px; }
         .btn-bingo { background: var(--accent); }
-        .last-ball { background: white; color: var(--dark); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; font-weight: bold; margin: 15px auto; border: 4px solid var(--accent); }
-        .grid { display: grid; grid-template-columns: repeat(9, 1fr); background: #2c3e50; gap: 2px; border: 2px solid #2c3e50; }
-        .cell { background: white; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.1rem; cursor: pointer; color: #333; position: relative; }
-        .marked::after { content: ""; position: absolute; width: 70%; height: 70%; border: 4px solid rgba(231, 76, 60, 0.7); border-radius: 50%; }
+        .last-ball { background: white; color: var(--dark); width: 70px; height: 70px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: bold; margin: 15px auto; border: 4px solid var(--accent); box-shadow: 0 0 15px var(--accent); }
+        
+        /* DISEÑO CARTÓN TRADICIONAL */
+        .grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; background: #2c3e50; padding: 5px; border-radius: 5px; }
+        .cell { background: white; aspect-ratio: 0.8; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.2rem; color: #333; border-radius: 4px; position: relative; }
+        .empty { background: #bdc3c7; }
+        .marked::after { content: "X"; position: absolute; color: rgba(233, 69, 96, 0.8); font-size: 2rem; }
     </style>
 </head>
 <body>
     <div id="login-screen">
         <div class="login-box">
-            <h2 style="color: var(--accent)">BINGO ONLINE</h2>
+            <h2 style="color: var(--accent)">BINGO</h2>
             <input type="text" id="nick-input" placeholder="Tu Nick">
-            <button class="btn btn-bingo" onclick="entrar()">JUGAR</button>
+            <button class="btn btn-bingo" onclick="entrar()">ENTRAR</button>
         </div>
     </div>
+
     <div id="game-screen">
-        <div style="display:flex; gap:10px; max-width:600px; margin:auto;">
+        <div style="display:flex; gap:10px; max-width:500px; margin:auto; margin-bottom:10px;">
             <button class="btn btn-linea" onclick="cantar('LÍNEA')">LÍNEA</button>
             <button class="btn btn-bingo" onclick="cantar('BINGO')">BINGO</button>
         </div>
         <div class="last-ball" id="last-ball">--</div>
-        <div class="ticket"><div class="grid" id="carton"></div></div>
+        <div style="background:#ecf0f1; padding:10px; border-radius:10px; max-width:600px; margin:auto;">
+            <div class="grid" id="carton"></div>
+        </div>
+        <p id="info-player" style="color: #888; margin-top:15px;"></p>
     </div>
 
     <script>
@@ -45,33 +52,39 @@
         const db = firebase.database();
         const sala = new URLSearchParams(window.location.search).get('sala') || "TEST";
         let miNick = localStorage.getItem('bingo_nick') || "";
-        const storageKey = `bingo_data_${sala}`;
+        const storageKey = `bingo_v2_${sala}`;
 
         function entrar() {
             miNick = document.getElementById('nick-input').value.trim();
-            if(!miNick) return alert("Nick necesario");
+            if(!miNick) return alert("Escribe un nick");
             localStorage.setItem('bingo_nick', miNick);
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('game-screen').style.display = 'block';
+            document.getElementById('info-player').innerText = "Jugador: " + miNick;
             init();
         }
 
         function init() {
-            let matrix = JSON.parse(localStorage.getItem(storageKey)) || generar();
+            let matrix = JSON.parse(localStorage.getItem(storageKey)) || generarNatural();
             render(matrix);
         }
 
-        function generar() {
+        function generarNatural() {
             const m = Array(3).fill().map(() => Array(9).fill(null));
-            const cols = Array(9).fill().map((_, i) => {
-                let min = i*10+(i==0?1:0), max = i==8?90:i*10+9;
-                let ns = []; while(ns.length<3){let n=Math.floor(Math.random()*(max-min+1))+min; if(!ns.includes(n)) ns.push(n);}
-                return ns.sort((a,b)=>a-b);
+            const numerosPorColumna = Array(9).fill().map((_, i) => {
+                let min = i*10 + (i==0?1:0), max = i==8?90:i*10+9;
+                let t = []; while(t.length<3){let n=Math.floor(Math.random()*(max-min+1))+min; if(!t.includes(n)) t.push(n);}
+                return t.sort((a,b)=>a-b);
             });
+
             for(let f=0; f<3; f++) {
-                let c_oc = 0; while(c_oc < 5) {
-                    let c = Math.floor(Math.random()*9);
-                    if(!m[f][c]) { m[f][c] = { v: cols[c].shift(), m: false }; c_oc++; }
+                let c_puestas = 0;
+                let indices = [0,1,2,3,4,5,6,7,8].sort(() => Math.random() - 0.5);
+                for(let c of indices) {
+                    if(c_puestas < 5 && !m[f][c]) {
+                        m[f][c] = { v: numerosPorColumna[c].shift(), m: false };
+                        c_puestas++;
+                    }
                 }
             }
             localStorage.setItem(storageKey, JSON.stringify(m));
@@ -80,22 +93,20 @@
 
         function render(m) {
             const cont = document.getElementById('carton'); cont.innerHTML = '';
-            m.forEach((fila, f) => fila.forEach((celda, c) => {
+            m.forEach((fila) => fila.forEach((celda) => {
                 const div = document.createElement('div');
                 div.className = celda ? `cell ${celda.m ? 'marked' : ''}` : 'cell empty';
-                if(celda) { div.innerText = celda.v; div.onclick = () => { celda.m = !celda.m; localStorage.setItem(storageKey, JSON.stringify(m)); render(m); }; }
+                if(celda) {
+                    div.innerText = celda.v;
+                    div.onclick = () => { celda.m = !celda.m; localStorage.setItem(storageKey, JSON.stringify(m)); render(m); };
+                }
                 cont.appendChild(div);
             }));
         }
 
         function cantar(tipo) {
-            // USAMOS PUSH PARA CREAR UN EVENTO NUEVO SIEMPRE
-            db.ref(`Salas/${sala}/Avisos`).push({
-                jugador: miNick,
-                tipo: tipo,
-                t: Date.now()
-            });
-            alert("¡Aviso enviado!");
+            db.ref(`Salas/${sala}/Avisos`).push({ jugador: miNick, tipo: tipo, t: Date.now() });
+            alert("¡" + tipo + " enviada!");
         }
 
         db.ref(`Salas/${sala}/Ultima`).on('value', snap => {
