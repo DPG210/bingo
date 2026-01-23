@@ -2,201 +2,112 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Mi Cartón de Bingo Profesional</title>
+    <title>Bingo Player - dpg210</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
     <style>
-        :root {
-            --paper-color: #ffffff;
-            --border-color: #2c3e50;
-            --ink-color: #333;
-            --stamp-color: rgba(231, 76, 60, 0.8);
-        }
+        :root { --paper: #ffffff; --dark: #1a1a2e; --accent: #e94560; --win: #27ae60; }
+        body { background: var(--dark); color: white; font-family: sans-serif; text-align: center; margin: 0; padding: 15px; }
+        
+        .setup-section { margin-bottom: 20px; background: #16213e; padding: 15px; border-radius: 10px; }
+        input { padding: 10px; border-radius: 5px; border: none; width: 80%; max-width: 300px; margin-bottom: 10px; font-size: 1rem; }
+        
+        .action-buttons { display: flex; gap: 10px; max-width: 500px; margin: 0 auto 20px auto; }
+        .btn { border: none; padding: 15px; border-radius: 10px; color: white; font-weight: bold; flex: 1; cursor: pointer; font-size: 1.1rem; }
+        .btn-linea { background: var(--win); }
+        .btn-bingo { background: var(--accent); }
 
-        body { 
-            background: #1a1a2e; 
-            font-family: Arial, sans-serif; 
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin: 0;
-            padding: 20px;
-        }
-
-        .last-num-panel {
-            background: #0f3460;
-            color: #ffd700;
-            padding: 15px 40px;
-            border-radius: 15px;
-            font-size: 3rem;
-            font-weight: bold;
-            margin-bottom: 30px;
-            border: 2px solid #ffd700;
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
-        }
-
-        .ticket {
-            background-color: var(--paper-color);
-            padding: 10px;
-            border-radius: 8px;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.4);
-            border: 4px solid var(--border-color);
-            max-width: 700px;
-            width: 100%;
-        }
-
-        .grid { 
-            display: grid; 
-            grid-template-columns: repeat(9, 1fr);
-            background: #2c3e50;
-            gap: 2px;
-            border: 2px solid #2c3e50;
-        }
-
-        .cell { 
-            background: white; 
-            aspect-ratio: 1; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            font-weight: 800; 
-            font-size: 1.6rem; 
-            cursor: pointer; 
-            position: relative;
-            color: var(--ink-color);
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        .empty {
-            background: #f8f9fa;
-            cursor: default;
-        }
-
-        .marked::after {
-            content: "";
-            position: absolute;
-            width: 80%;
-            height: 80%;
-            border: 5px solid var(--stamp-color);
-            border-radius: 50%;
-            transform: rotate(-10deg);
-        }
-
-        .sala-tag {
-            color: #888;
-            font-size: 0.8rem;
-            margin-top: 15px;
-        }
+        .last-num-container { background: white; color: var(--dark); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; font-weight: bold; margin: 10px auto; border: 4px solid var(--accent); }
+        
+        .ticket { background: var(--paper); padding: 10px; border-radius: 8px; max-width: 600px; margin: auto; border: 3px solid #2c3e50; }
+        .grid { display: grid; grid-template-columns: repeat(9, 1fr); background: #2c3e50; gap: 2px; }
+        .cell { background: white; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.2rem; cursor: pointer; color: #333; position: relative; }
+        .empty { background: #f0f0f0; }
+        .marked::after { content: ""; position: absolute; width: 70%; height: 70%; border: 4px solid rgba(231, 76, 60, 0.7); border-radius: 50%; }
     </style>
 </head>
 <body>
 
-    <div class="last-num-panel" id="last-ball">--</div>
+    <div class="setup-section">
+        <input type="text" id="nick-name" placeholder="Escribe tu Nick aquí...">
+        <div class="action-buttons">
+            <button class="btn btn-linea" onclick="cantar('LÍNEA')">¡LÍNEA!</button>
+            <button class="btn btn-bingo" onclick="cantar('BINGO')">¡BINGO!</button>
+        </div>
+    </div>
+
+    <div class="last-num-container" id="last-ball">--</div>
     
     <div class="ticket">
         <div class="grid" id="carton"></div>
     </div>
 
-    <div class="sala-tag">ID SALA: <span id="sala-id">---</span></div>
+    <p style="color: #888; font-size: 0.8rem; margin-top: 15px;">SALA: <span id="sala-id">...</span></p>
 
     <script>
         const firebaseConfig = { databaseURL: "https://bingov3-1ec3a-default-rtdb.europe-west1.firebasedatabase.app/" };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const sala = urlParams.get('sala') || "TEST";
+        const sala = new URLSearchParams(window.location.search).get('sala') || "TEST";
         document.getElementById('sala-id').innerText = sala;
 
-        // --- LÓGICA DE GENERACIÓN ---
-        function generarEstructuraCarton() {
+        // --- PERSISTENCIA Y GENERACIÓN ---
+        const storageKey = `bingo_carton_${sala}`;
+        let miCarton = JSON.parse(localStorage.getItem(storageKey)) || generarEstructura();
+
+        function generarEstructura() {
             const matrix = Array(3).fill().map(() => Array(9).fill(null));
-            const columnas = Array(9).fill().map(() => []);
-
-            let numsPorColumna = Array(9).fill(1);
-            let extras = 6;
-            while(extras > 0) {
-                let c = Math.floor(Math.random() * 9);
-                if(numsPorColumna[c] < 3) {
-                    numsPorColumna[c]++;
-                    extras--;
-                }
-            }
-
-            for(let c=0; c<9; c++) {
-                let min = (c * 10) + (c === 0 ? 1 : 0);
-                let max = (c === 8 ? 90 : (c * 10) + 9);
-                while(columnas[c].length < numsPorColumna[c]) {
+            const cols = Array(9).fill().map((_, i) => {
+                let min = i * 10 + (i === 0 ? 1 : 0);
+                let max = i === 8 ? 90 : i * 10 + 9;
+                let nums = [];
+                while(nums.length < 3) {
                     let n = Math.floor(Math.random() * (max - min + 1)) + min;
-                    if(!columnas[c].includes(n)) columnas[c].push(n);
+                    if(!nums.includes(n)) nums.push(n);
                 }
-                columnas[c].sort((a, b) => a - b);
-            }
-
+                return nums.sort((a,b) => a-b);
+            });
             for(let f=0; f<3; f++) {
-                let ocupadosEnFila = 0;
-                for(let c=0; c<9; c++) {
-                    if(columnas[c].length > 0 && ocupadosEnFila < 5) {
-                        if(columnas[c].length === (3 - f) || Math.random() > 0.5) {
-                            matrix[f][c] = { valor: columnas[c].shift(), marcado: false };
-                            ocupadosEnFila++;
-                        }
-                    }
+                let c_ocupadas = 0;
+                while(c_ocupadas < 5) {
+                    let c = Math.floor(Math.random() * 9);
+                    if(!matrix[f][c]) { matrix[f][c] = { valor: cols[c].shift(), marcado: false }; c_ocupadas++; }
                 }
-                if(ocupadosEnFila < 5) return generarEstructuraCarton();
             }
+            localStorage.setItem(storageKey, JSON.stringify(matrix));
             return matrix;
         }
 
-        // --- LÓGICA DE PERSISTENCIA ---
-        const storageKey = `bingo_carton_${sala}`;
-        let miCarton;
-
-        // Intentar cargar cartón guardado
-        const savedCarton = localStorage.getItem(storageKey);
-        if (savedCarton) {
-            miCarton = JSON.parse(savedCarton);
-        } else {
-            miCarton = generarEstructuraCarton();
-            localStorage.setItem(storageKey, JSON.stringify(miCarton));
-        }
-
-        function toggleMarca(f, c) {
-            if (miCarton[f][c]) {
+        function toggle(f, c) {
+            if(miCarton[f][c]) {
                 miCarton[f][c].marcado = !miCarton[f][c].marcado;
                 localStorage.setItem(storageKey, JSON.stringify(miCarton));
-                renderizar();
+                render();
             }
         }
 
-        function renderizar() {
-            const cartonDiv = document.getElementById('carton');
-            cartonDiv.innerHTML = '';
-            miCarton.forEach((fila, fIndex) => {
-                fila.forEach((celda, cIndex) => {
-                    const div = document.createElement('div');
-                    if(!celda) {
-                        div.className = 'cell empty';
-                    } else {
-                        div.className = 'cell' + (celda.marcado ? ' marked' : '');
-                        div.innerText = celda.valor;
-                        div.onclick = () => toggleMarca(fIndex, cIndex);
-                    }
-                    cartonDiv.appendChild(div);
-                });
-            });
+        function render() {
+            const container = document.getElementById('carton');
+            container.innerHTML = '';
+            miCarton.forEach((fila, f) => fila.forEach((celda, c) => {
+                const div = document.createElement('div');
+                div.className = celda ? `cell ${celda.marcado ? 'marked' : ''}` : 'cell empty';
+                if(celda) { div.innerText = celda.valor; div.onclick = () => toggle(f,c); }
+                container.appendChild(div);
+            }));
         }
 
-        renderizar();
+        function cantar(tipo) {
+            const nick = document.getElementById('nick-name').value;
+            if(!nick) return alert("Ponte un nick primero");
+            db.ref(`Salas/${sala}/Aviso`).set({ jugador: nick, tipo: tipo, t: Date.now() });
+        }
 
-        // Escuchar Firebase
-        db.ref(`Salas/${sala}/Ultima`).on('value', (snapshot) => {
-            const val = snapshot.val();
-            if(val) {
-                document.getElementById('last-ball').innerText = val;
-                if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-            }
+        render();
+        db.ref(`Salas/${sala}/Ultima`).on('value', snap => {
+            if(snap.val()) document.getElementById('last-ball').innerText = snap.val();
         });
     </script>
 </body>
