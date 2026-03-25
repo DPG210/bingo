@@ -33,8 +33,8 @@
 
         /* DISEÑO CARTÓN TRADICIONAL */
         .grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; background: #2c3e50; padding: 5px; border-radius: 5px; }
-        .cell { background: white; aspect-ratio: 0.8; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.2rem; color: #333; border-radius: 4px; position: relative; }
-        .empty { background: #bdc3c7; }
+        .cell { background: white; aspect-ratio: 0.8; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.2rem; color: #333; border-radius: 4px; position: relative; cursor: pointer; }
+        .empty { background: #bdc3c7; cursor: default; }
         .marked::after { content: "X"; position: absolute; color: rgba(233, 69, 96, 0.8); font-size: 2rem; }
     </style>
 </head>
@@ -105,21 +105,60 @@
         let miNick = localStorage.getItem('bingo_nick') || "";
         let numCartones = 0;
         let favoritos = [];
+        let setupKey = "";
+
+        function buildSetupKey() {
+            return `bingo_setup_${sala}_${miNick}`;
+        }
 
         function entrar() {
             miNick = document.getElementById('nick-input').value.trim();
             if (!miNick) return alert("Escribe un nick");
             localStorage.setItem('bingo_nick', miNick);
+            setupKey = buildSetupKey();
             document.getElementById('login-screen').classList.add('hidden');
             document.getElementById('setup-screen').classList.remove('hidden');
             document.getElementById('nick-label').innerText = "Jugador: " + miNick;
+            cargarConfiguracionGuardada();
         }
 
-        function seleccionarCartones(cantidad) {
+        function cargarConfiguracionGuardada() {
+            const setup = leerSetupGuardado();
+            if (!setup) return;
+
+            if (setup.cartones > 0) {
+                seleccionarCartones(setup.cartones, true);
+            }
+
+            if (Array.isArray(setup.favoritos) && setup.favoritos.length > 0) {
+                cargarFavoritosEnUI(setup.favoritos);
+                favoritos = setup.favoritos;
+            }
+        }
+
+        function leerSetupGuardado() {
+            try {
+                const raw = localStorage.getItem(setupKey || buildSetupKey());
+                return raw ? JSON.parse(raw) : null;
+            } catch {
+                return null;
+            }
+        }
+
+        function guardarSetupGuardado(cartones, favoritosData) {
+            if (!miNick) return;
+            const payload = {
+                cartones,
+                favoritos: favoritosData
+            };
+            localStorage.setItem(setupKey || buildSetupKey(), JSON.stringify(payload));
+        }
+
+        function seleccionarCartones(cantidad, desdeRestauracion = false) {
             numCartones = cantidad;
             document.getElementById('favorites-section').classList.remove('hidden');
             document.getElementById('favorites-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
-            document.getElementById('fav1-number').focus();
+            if (!desdeRestauracion) document.getElementById('fav1-number').focus();
 
             for (let i = 1; i <= 3; i++) {
                 const btn = document.getElementById(`carton-btn-${i}`);
@@ -127,6 +166,7 @@
             }
 
             actualizarCheckboxesFavoritos();
+            guardarSetupGuardado(numCartones, recolectarFavoritos(false));
         }
 
         function actualizarCheckboxesFavoritos() {
@@ -140,22 +180,35 @@
             }
         }
 
+        function cargarFavoritosEnUI(lista) {
+            const ordenados = [...lista].slice(0, 2);
+            if (ordenados[0]) {
+                document.getElementById('fav1-number').value = ordenados[0].numero ?? '';
+                [1,2,3].forEach(c => document.getElementById(`fav1-c${c}`).checked = (ordenados[0].cartons || []).includes(c));
+            }
+            if (ordenados[1]) {
+                document.getElementById('fav2-number').value = ordenados[1].numero ?? '';
+                [1,2,3].forEach(c => document.getElementById(`fav2-c${c}`).checked = (ordenados[1].cartons || []).includes(c));
+            }
+        }
+
         function comenzarPartida() {
             if (!numCartones) return alert("Elige cuántos cartones quieres");
 
-            favoritos = recolectarFavoritos();
+            favoritos = recolectarFavoritos(true);
             if (favoritos.length === 0) {
                 alert("Escribe al menos 1 número favorito y selecciona en qué cartón aparecerá.");
                 return;
             }
 
+            guardarSetupGuardado(numCartones, favoritos);
             document.getElementById('setup-screen').classList.add('hidden');
             document.getElementById('game-screen').style.display = 'block';
             document.getElementById('info-player').innerText = `Jugador: ${miNick} | Cartones: ${numCartones}`;
             init(numCartones, favoritos);
         }
 
-        function recolectarFavoritos() {
+        function recolectarFavoritos(estricto) {
             const resultado = [];
             for (let i = 1; i <= 2; i++) {
                 const input = document.getElementById(`fav${i}-number`).value.trim();
@@ -163,8 +216,9 @@
 
                 const numero = parseInt(input, 10);
                 if (!Number.isInteger(numero) || numero < 1 || numero > 90) {
-                    alert(`El favorito ${i} no es válido`);
-                    throw new Error("Número favorito inválido");
+                    if (estricto) alert(`El favorito ${i} no es válido`);
+                    if (estricto) throw new Error("Número favorito inválido");
+                    continue;
                 }
 
                 const cartons = [1, 2, 3].filter(c => {
@@ -173,8 +227,9 @@
                 });
 
                 if (cartons.length === 0) {
-                    alert(`Selecciona al menos un cartón para el favorito ${i}`);
-                    throw new Error("Cartón favorito no seleccionado");
+                    if (estricto) alert(`Selecciona al menos un cartón para el favorito ${i}`);
+                    if (estricto) throw new Error("Cartón favorito no seleccionado");
+                    continue;
                 }
 
                 resultado.push({ numero, cartons });
@@ -207,7 +262,14 @@
                     .map(f => f.numero);
 
                 const key = `bingo_v3_${sala}_${miNick}_${cantidad}_${signature}_${cartonIndex}`;
-                let matrix = JSON.parse(localStorage.getItem(key)) || generarNatural(key, forced);
+                let matrix = JSON.parse(localStorage.getItem(key));
+
+                if (matrix) {
+                    ordenarColumnasAscendente(matrix);
+                    localStorage.setItem(key, JSON.stringify(matrix));
+                } else {
+                    matrix = generarNatural(key, forced);
+                }
 
                 const wrapper = document.createElement('div');
                 wrapper.className = 'carton-card';
