@@ -62,7 +62,7 @@
             </div>
 
             <div id="favorites-section" class="section hidden">
-                <p style="margin-top: 0; color: #c8d6e5; font-weight: bold;">2. Elige 1 o 2 números favoritos y en qué cartones aparecerán</p>
+                <p style="margin-top: 0; color: #c8d6e5; font-weight: bold;">2. Ahora escribe 1 o 2 números favoritos y en qué cartones aparecerán</p>
 
                 <div class="fav-row">
                     <input type="number" id="fav1-number" min="1" max="90" placeholder="Favorito 1">
@@ -118,6 +118,8 @@
         function seleccionarCartones(cantidad) {
             numCartones = cantidad;
             document.getElementById('favorites-section').classList.remove('hidden');
+            document.getElementById('favorites-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            document.getElementById('fav1-number').focus();
 
             for (let i = 1; i <= 3; i++) {
                 const btn = document.getElementById(`carton-btn-${i}`);
@@ -142,6 +144,11 @@
             if (!numCartones) return alert("Elige cuántos cartones quieres");
 
             favoritos = recolectarFavoritos();
+            if (favoritos.length === 0) {
+                alert("Escribe al menos 1 número favorito y selecciona en qué cartón aparecerá.");
+                return;
+            }
+
             document.getElementById('setup-screen').classList.add('hidden');
             document.getElementById('game-screen').style.display = 'block';
             document.getElementById('info-player').innerText = `Jugador: ${miNick} | Cartones: ${numCartones}`;
