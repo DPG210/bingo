@@ -301,9 +301,70 @@
         let numCartones = 0;
         let favoritos = [];
         let setupKey = "";
+        const partidaKey = `bingo_state_${sala}`;
 
         function buildSetupKey() {
-            return `bingo_setup_${sala}_${miNick}`;
+            return `bingo_setup_${sala}`;
+        }
+
+        function leerEstadoPartida() {
+            try {
+                const raw = localStorage.getItem(partidaKey);
+                return raw ? JSON.parse(raw) : null;
+            } catch {
+                return null;
+            }
+        }
+
+        function guardarEstadoPartida(activa) {
+            if (!miNick) return;
+            localStorage.setItem(partidaKey, JSON.stringify({
+                activa,
+                cartones: numCartones,
+                favoritos
+            }));
+        }
+
+        function mostrarLogin() {
+            document.getElementById('login-screen').classList.remove('hidden');
+            document.getElementById('setup-screen').classList.add('hidden');
+            document.getElementById('game-screen').style.display = 'none';
+        }
+
+        function mostrarConfiguracion() {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('setup-screen').classList.remove('hidden');
+            document.getElementById('game-screen').style.display = 'none';
+            document.getElementById('nick-label').innerText = "Jugador: " + miNick;
+        }
+
+        function mostrarJuego() {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('setup-screen').classList.add('hidden');
+            document.getElementById('game-screen').style.display = 'block';
+        }
+
+        function restaurarPartidaGuardada() {
+            const setup = leerSetupGuardado();
+            const estado = leerEstadoPartida();
+
+            if (!setup || !estado || !estado.activa || !setup.cartones) {
+                mostrarConfiguracion();
+                if (setup?.cartones > 0) {
+                    seleccionarCartones(setup.cartones, true);
+                }
+                if (Array.isArray(setup?.favoritos) && setup.favoritos.length > 0) {
+                    cargarFavoritosEnUI(setup.favoritos);
+                    favoritos = setup.favoritos;
+                }
+                return;
+            }
+
+            numCartones = setup.cartones;
+            favoritos = Array.isArray(setup.favoritos) ? setup.favoritos : [];
+            mostrarJuego();
+            document.getElementById('info-player').innerText = `Jugador: ${miNick} | Cartones: ${numCartones}`;
+            init(numCartones, favoritos);
         }
 
         function entrar() {
@@ -311,9 +372,7 @@
             if (!miNick) return alert("Escribe un nick");
             localStorage.setItem('bingo_nick', miNick);
             setupKey = buildSetupKey();
-            document.getElementById('login-screen').classList.add('hidden');
-            document.getElementById('setup-screen').classList.remove('hidden');
-            document.getElementById('nick-label').innerText = "Jugador: " + miNick;
+            mostrarConfiguracion();
             cargarConfiguracionGuardada();
         }
 
@@ -392,8 +451,8 @@
 
             favoritos = recolectarFavoritos(true);
             guardarSetupGuardado(numCartones, favoritos);
-            document.getElementById('setup-screen').classList.add('hidden');
-            document.getElementById('game-screen').style.display = 'block';
+            guardarEstadoPartida(true);
+            mostrarJuego();
             document.getElementById('info-player').innerText = `Jugador: ${miNick} | Cartones: ${numCartones}`;
             init(numCartones, favoritos);
         }
@@ -451,7 +510,7 @@
                     .filter(f => f.cartons.includes(cartonIndex))
                     .map(f => f.numero);
 
-                const key = `bingo_v3_${sala}_${miNick}_${cantidad}_${signature}_${cartonIndex}`;
+                const key = `bingo_v3_${sala}_${cantidad}_${signature}_${cartonIndex}`;
                 let matrix = JSON.parse(localStorage.getItem(key));
 
                 if (matrix) {
@@ -616,6 +675,17 @@
         db.ref(`Salas/${sala}/Ultima`).on('value', snap => {
             if (snap.val()) document.getElementById('last-ball').innerText = snap.val();
         });
+
+        (function iniciarAplicacion() {
+            setupKey = buildSetupKey();
+            if (!miNick) {
+                mostrarLogin();
+                return;
+            }
+
+            document.getElementById('nick-input').value = miNick;
+            restaurarPartidaGuardada();
+        })();
     </script>
 </body>
 </html>
