@@ -346,17 +346,9 @@
 
         function restaurarPartidaGuardada() {
             const setup = leerSetupGuardado();
-            const estado = leerEstadoPartida();
 
-            if (!setup || !estado || !estado.activa || !setup.cartones) {
+            if (!setup || !setup.cartones) {
                 mostrarConfiguracion();
-                if (setup?.cartones > 0) {
-                    seleccionarCartones(setup.cartones, true);
-                }
-                if (Array.isArray(setup?.favoritos) && setup.favoritos.length > 0) {
-                    cargarFavoritosEnUI(setup.favoritos);
-                    favoritos = setup.favoritos;
-                }
                 return;
             }
 
@@ -372,8 +364,14 @@
             if (!miNick) return alert("Escribe un nick");
             localStorage.setItem('bingo_nick', miNick);
             setupKey = buildSetupKey();
+            document.getElementById('nick-label').innerText = "Jugador: " + miNick;
+
+            if (leerSetupGuardado()) {
+                restaurarPartidaGuardada();
+                return;
+            }
+
             mostrarConfiguracion();
-            cargarConfiguracionGuardada();
         }
 
         function cargarConfiguracionGuardada() {
