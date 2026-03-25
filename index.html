@@ -62,7 +62,7 @@
             </div>
 
             <div id="favorites-section" class="section hidden">
-                <p style="margin-top: 0; color: #c8d6e5; font-weight: bold;">2. Ahora escribe 1 o 2 números favoritos y en qué cartones aparecerán</p>
+                <p style="margin-top: 0; color: #c8d6e5; font-weight: bold;">2. Si quieres, escribe 1 o 2 números favoritos y en qué cartones aparecerán</p>
 
                 <div class="fav-row">
                     <input type="number" id="fav1-number" min="1" max="90" placeholder="Favorito 1">
@@ -196,11 +196,6 @@
             if (!numCartones) return alert("Elige cuántos cartones quieres");
 
             favoritos = recolectarFavoritos(true);
-            if (favoritos.length === 0) {
-                alert("Escribe al menos 1 número favorito y selecciona en qué cartón aparecerá.");
-                return;
-            }
-
             guardarSetupGuardado(numCartones, favoritos);
             document.getElementById('setup-screen').classList.add('hidden');
             document.getElementById('game-screen').style.display = 'block';
