@@ -9,20 +9,26 @@
     <style>
         :root { --dark: #1a1a2e; --accent: #e94560; --win: #27ae60; }
         body { background: var(--dark); color: white; font-family: 'Segoe UI', sans-serif; text-align: center; margin: 0; padding: 10px; }
-        #login-screen { display: flex; align-items: center; justify-content: center; height: 90vh; }
+        #login-screen, #carton-screen { display: flex; align-items: center; justify-content: center; height: 90vh; }
         .login-box { background: #16213e; padding: 30px; border-radius: 20px; width: 85%; max-width: 350px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        #game-screen { display: none; }
+        #carton-screen, #game-screen { display: none; }
         input { padding: 15px; border-radius: 10px; border: none; width: 90%; margin-bottom: 20px; font-size: 1.1rem; text-align: center; background: #0f3460; color: white; }
         .btn { border: none; padding: 15px; border-radius: 12px; color: white; font-weight: bold; cursor: pointer; width: 100%; font-size: 1rem; }
         .btn-linea { background: var(--win); margin-bottom: 10px; }
         .btn-bingo { background: var(--accent); }
+        .btn-secondary { background: #0f3460; }
+        .btn-small { width: auto; min-width: 70px; }
         .last-ball { background: white; color: var(--dark); width: 70px; height: 70px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: bold; margin: 15px auto; border: 4px solid var(--accent); box-shadow: 0 0 15px var(--accent); }
-        
+
+        .cartones-wrap { display: flex; flex-direction: column; gap: 16px; width: min(100%, 900px); margin: 0 auto; }
+        .carton-card { background: #ecf0f1; padding: 10px; border-radius: 10px; }
+
         /* DISEÑO CARTÓN TRADICIONAL */
         .grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; background: #2c3e50; padding: 5px; border-radius: 5px; }
         .cell { background: white; aspect-ratio: 0.8; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.2rem; color: #333; border-radius: 4px; position: relative; }
         .empty { background: #bdc3c7; }
         .marked::after { content: "X"; position: absolute; color: rgba(233, 69, 96, 0.8); font-size: 2rem; }
+        .choice-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
     </style>
 </head>
 <body>
@@ -34,15 +40,26 @@
         </div>
     </div>
 
+    <div id="carton-screen">
+        <div class="login-box">
+            <h2 style="color: var(--accent); margin-top: 0;">ELIGE TUS CARTONES</h2>
+            <p id="nick-label" style="margin-top: 0; color: #c8d6e5;"></p>
+            <div class="choice-row">
+                <button class="btn btn-secondary btn-small" onclick="elegirCartones(1)">1</button>
+                <button class="btn btn-secondary btn-small" onclick="elegirCartones(2)">2</button>
+                <button class="btn btn-secondary btn-small" onclick="elegirCartones(3)">3</button>
+            </div>
+            <p style="color:#b2bec3; margin-bottom: 0;">Selecciona cuántos cartones quieres para esta partida.</p>
+        </div>
+    </div>
+
     <div id="game-screen">
         <div style="display:flex; gap:10px; max-width:500px; margin:auto; margin-bottom:10px;">
             <button class="btn btn-linea" onclick="cantar('LÍNEA')">LÍNEA</button>
             <button class="btn btn-bingo" onclick="cantar('BINGO')">BINGO</button>
         </div>
         <div class="last-ball" id="last-ball">--</div>
-        <div style="background:#ecf0f1; padding:10px; border-radius:10px; max-width:600px; margin:auto;">
-            <div class="grid" id="carton"></div>
-        </div>
+        <div class="cartones-wrap" id="cartones-container"></div>
         <p id="info-player" style="color: #888; margin-top:15px;"></p>
     </div>
 
@@ -52,53 +69,83 @@
         const db = firebase.database();
         const sala = new URLSearchParams(window.location.search).get('sala') || "TEST";
         let miNick = localStorage.getItem('bingo_nick') || "";
-        const storageKey = `bingo_v2_${sala}`;
+        let numCartones = 0;
 
         function entrar() {
             miNick = document.getElementById('nick-input').value.trim();
-            if(!miNick) return alert("Escribe un nick");
+            if (!miNick) return alert("Escribe un nick");
             localStorage.setItem('bingo_nick', miNick);
             document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('nick-label').innerText = "Jugador: " + miNick;
+            document.getElementById('carton-screen').style.display = 'flex';
+        }
+
+        function elegirCartones(cantidad) {
+            numCartones = cantidad;
+            localStorage.setItem(`bingo_cartones_${sala}_${miNick}`, String(cantidad));
+            document.getElementById('carton-screen').style.display = 'none';
             document.getElementById('game-screen').style.display = 'block';
-            document.getElementById('info-player').innerText = "Jugador: " + miNick;
-            init();
+            document.getElementById('info-player').innerText = `Jugador: ${miNick} | Cartones: ${numCartones}`;
+            init(numCartones);
         }
 
-        function init() {
-            let matrix = JSON.parse(localStorage.getItem(storageKey)) || generarNatural();
-            render(matrix);
+        function init(cantidad) {
+            const cont = document.getElementById('cartones-container');
+            cont.innerHTML = '';
+
+            for (let i = 0; i < cantidad; i++) {
+                const key = `bingo_v2_${sala}_${miNick}_${i}`;
+                let matrix = JSON.parse(localStorage.getItem(key)) || generarNatural(key);
+                const wrapper = document.createElement('div');
+                wrapper.className = 'carton-card';
+                wrapper.innerHTML = `<p style="color:#888; margin-top:0;">Cartón ${i + 1}</p>`;
+                const grid = document.createElement('div');
+                grid.className = 'grid';
+                wrapper.appendChild(grid);
+                cont.appendChild(wrapper);
+                render(matrix, grid, key);
+            }
         }
 
-        function generarNatural() {
+        function generarNatural(storageKey) {
             const m = Array(3).fill().map(() => Array(9).fill(null));
             const numerosPorColumna = Array(9).fill().map((_, i) => {
-                let min = i*10 + (i==0?1:0), max = i==8?90:i*10+9;
-                let t = []; while(t.length<3){let n=Math.floor(Math.random()*(max-min+1))+min; if(!t.includes(n)) t.push(n);}
-                return t.sort((a,b)=>a-b);
+                let min = i * 10 + (i == 0 ? 1 : 0), max = i == 8 ? 90 : i * 10 + 9;
+                let t = [];
+                while (t.length < 3) {
+                    let n = Math.floor(Math.random() * (max - min + 1)) + min;
+                    if (!t.includes(n)) t.push(n);
+                }
+                return t.sort((a, b) => a - b);
             });
 
-            for(let f=0; f<3; f++) {
+            for (let f = 0; f < 3; f++) {
                 let c_puestas = 0;
                 let indices = [0,1,2,3,4,5,6,7,8].sort(() => Math.random() - 0.5);
-                for(let c of indices) {
-                    if(c_puestas < 5 && !m[f][c]) {
+                for (let c of indices) {
+                    if (c_puestas < 5 && !m[f][c]) {
                         m[f][c] = { v: numerosPorColumna[c].shift(), m: false };
                         c_puestas++;
                     }
                 }
             }
+
             localStorage.setItem(storageKey, JSON.stringify(m));
             return m;
         }
 
-        function render(m) {
-            const cont = document.getElementById('carton'); cont.innerHTML = '';
+        function render(m, cont, storageKey) {
+            cont.innerHTML = '';
             m.forEach((fila) => fila.forEach((celda) => {
                 const div = document.createElement('div');
                 div.className = celda ? `cell ${celda.m ? 'marked' : ''}` : 'cell empty';
-                if(celda) {
+                if (celda) {
                     div.innerText = celda.v;
-                    div.onclick = () => { celda.m = !celda.m; localStorage.setItem(storageKey, JSON.stringify(m)); render(m); };
+                    div.onclick = () => {
+                        celda.m = !celda.m;
+                        localStorage.setItem(storageKey, JSON.stringify(m));
+                        render(m, cont, storageKey);
+                    };
                 }
                 cont.appendChild(div);
             }));
@@ -110,7 +157,7 @@
         }
 
         db.ref(`Salas/${sala}/Ultima`).on('value', snap => {
-            if(snap.val()) document.getElementById('last-ball').innerText = snap.val();
+            if (snap.val()) document.getElementById('last-ball').innerText = snap.val();
         });
     </script>
 </body>
