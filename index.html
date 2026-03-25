@@ -306,6 +306,7 @@
         const lineaKey = `bingo_linea_${sala}`;
         const lineaConfirmadaKey = `bingo_linea_confirmada_${sala}`;
         const lineaSignalKey = `bingo_linea_signal_${sala}`;
+        let lineaPollingTimer = null;
 
         function buildSetupKey() {
             return `bingo_setup_${sala}`;
@@ -346,6 +347,7 @@
             document.getElementById('login-screen').classList.add('hidden');
             document.getElementById('setup-screen').classList.add('hidden');
             document.getElementById('game-screen').style.display = 'block';
+            iniciarPollingLinea();
         }
 
         function leerLineaGanada() {
@@ -370,6 +372,13 @@
             const ganada = leerLineaGanada();
             btnLinea.disabled = ganada;
             btnLinea.style.opacity = ganada ? '0.45' : '1';
+        }
+
+        function iniciarPollingLinea() {
+            if (lineaPollingTimer) return;
+            lineaPollingTimer = setInterval(() => {
+                aplicarEstadoLinea();
+            }, 1000);
         }
 
         function restaurarPartidaGuardada() {
@@ -735,6 +744,13 @@
             document.getElementById('nick-input').value = miNick;
             restaurarPartidaGuardada();
         })();
+
+        window.addEventListener('beforeunload', () => {
+            if (lineaPollingTimer) {
+                clearInterval(lineaPollingTimer);
+                lineaPollingTimer = null;
+            }
+        });
     </script>
 </body>
 </html>
